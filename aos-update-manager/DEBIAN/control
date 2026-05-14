@@ -1,0 +1,7 @@
+Package: aos-update-manager
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Hakkı <archiveosofficial@gmail.com>
+Description: ArchiveOS updater

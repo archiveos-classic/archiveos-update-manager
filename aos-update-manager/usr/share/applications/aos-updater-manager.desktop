@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=ArchiveOS Update Manager
+Exec=/usr/bin/aos-update-manager.py
+Icon=/usr/share/icons/aos-update-manager.png
+Type=Application
+Categories=Utility;
