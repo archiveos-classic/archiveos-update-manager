@@ -57,7 +57,7 @@ STRINGS = {
         "checking": "Güncellemeler denetleniyor...",
         "offline": "Bağlantı Yok (v{})",
         "found": "Yeni Sürüm: v{}",
-        "ask": "v{} sürümünü kurmak için terminal açılsın mı?",
+        "ask": "v{} sürümünü kurmak için terminal açılsın mı?\n\n<b>Sürüm Notları:</b>\n{}",
         "latest": "Sistem Güncel (v{})",
         "btn_recheck": "Yeniden Dene",
         "terminal_msg": "ArchiveOS Kurulumu - Root şifresini girin.",
@@ -72,7 +72,7 @@ STRINGS = {
         "checking": "Checking for updates...",
         "offline": "Offline (v{})",
         "found": "New Version: v{}",
-        "ask": "Open terminal to install v{}?",
+        "ask": "Open terminal to install v{}?\n\n<b>Changelog:</b>\n{}",
         "latest": "System Up-to-date (v{})",
         "btn_recheck": "Try Again",
         "terminal_msg": "ArchiveOS Installation - Enter root password.",
@@ -86,7 +86,8 @@ STRINGS = {
 
 class UpdateWorker(QThread):
     progress = pyqtSignal(int)
-    finished = pyqtSignal(bool, str, bool)
+    # finished sinyali artık changelog verisini de taşıyor (bool, str, bool, str)
+    finished = pyqtSignal(bool, str, bool, str)
 
     def run(self):
         local_version = "0.0.0"
@@ -105,13 +106,20 @@ class UpdateWorker(QThread):
             self.progress.emit(30)
             response = requests.get(REMOTE_JSON_URL, timeout=7)
             if response.status_code == 200:
-                remote_version = response.json().get("version", "0.0.0")
+                data = response.json()
+                remote_version = data.get("version", "0.0.0")
+
+                # Sürüm notlarını dile göre çek, yoksa varsayılan metni kullan
+                changelog = data.get(f"changelog_{LANG}", data.get("changelog", ""))
+                if not changelog:
+                    changelog = "Sürüm notu belirtilmedi." if LANG == "tr" else "No changelog provided."
+
                 self.progress.emit(90)
-                self.finished.emit(remote_version != local_version, remote_version, False)
+                self.finished.emit(remote_version != local_version, remote_version, False, changelog)
             else:
-                self.finished.emit(False, local_version, True)
+                self.finished.emit(False, local_version, True, "")
         except:
-            self.finished.emit(False, local_version, True)
+            self.finished.emit(False, local_version, True, "")
 
 class ArchiveOSUpdateManager(QMainWindow):
     def __init__(self):
@@ -183,7 +191,7 @@ class ArchiveOSUpdateManager(QMainWindow):
         except Exception as e:
             logging.error(f"Bildirim gönderilemedi: {e}")
 
-    def handle_result(self, update_available, version_info, is_error):
+    def handle_result(self, update_available, version_info, is_error, changelog):
         self.progress_bar.setValue(100)
         self.btn_check.setEnabled(True)
         if is_error:
@@ -194,7 +202,10 @@ class ArchiveOSUpdateManager(QMainWindow):
             self.send_notification(version_info)
             if SILENT_MODE:
                 sys.exit(0)
-            res = QMessageBox.question(self, "Update", STRINGS[LANG]["ask"].format(version_info))
+
+            # Sürüm notlarını formatlayıp soru kutusuna basıyoruz
+            ask_text = STRINGS[LANG]["ask"].format(version_info, changelog)
+            res = QMessageBox.question(self, "Update", ask_text)
             if res == QMessageBox.StandardButton.Yes:
                 self.install_update(version_info)
         else:
